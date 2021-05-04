@@ -193,11 +193,21 @@ impl OperatingConfig {
         let note_key = u64encode(&format!("{}{{}}{}", app_name, &cert_name))?;
         let note = get_saved_credential(&note_key)?;
         let json = json_from_str(&note)?;
+        // npdId is in the customer ASNP
+        let asnp = json["custAsnp"].as_str().ok_or_else(err)?;
+        let inner_json = json_from_str(asnp)?;
+        let payload = inner_json["payload"].as_str().ok_or_else(err)?;
+        let inner_json = json_from_base64(payload)?;
+        let npd_id = inner_json["npdId"].as_str().ok_or_else(err)?;
+        if !self.npd_id.eq_ignore_ascii_case(npd_id) {
+            return Err(eyre!("Cached npdId does not match license npdId"));
+        }
+        // legacy profile is in the Adobe ASNP
         let asnp = json["asnp"].as_str().ok_or_else(err)?;
-        let json = json_from_str(asnp)?;
-        let payload = json["payload"].as_str().ok_or_else(err)?;
-        let json = json_from_base64(payload)?;
-        let legacy_profile = json["legacyProfile"].as_str().ok_or_else(err)?;
+        let inner_json = json_from_str(asnp)?;
+        let payload = inner_json["payload"].as_str().ok_or_else(err)?;
+        let inner_json = json_from_base64(payload)?;
+        let legacy_profile = inner_json["legacyProfile"].as_str().ok_or_else(err)?;
         let json = json_from_str(legacy_profile)?;
         let timestamp = json["effectiveEndTimestamp"].as_i64().ok_or_else(err)?;
         Ok(timestamp.to_string())
